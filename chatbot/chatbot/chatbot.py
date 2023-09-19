@@ -37,22 +37,22 @@ def get_data_loader() -> str:
 
 
 def answer_using_chatgpt(user_input: str):
-    # llm 생성
+    print("create llm ...")
     llm = ChatOpenAI(
         openai_api_key=open("../appkey.txt", "r").read(),
         model_name="gpt-3.5-turbo"
     )
 
-    # prompt 생성
+    print("create prompt template ...")
     prompt_template = ChatPromptTemplate.from_messages(
         [
             SystemMessagePromptTemplate.from_template(
-                """
+                f"""
                 assistant는 챗봇으로서 동작한다. 가이드를 참고하여 질문에 답변한다.
 
                 가이드
                 '''
-                {guide}
+                {get_data_loader()}
                 '''
                 """
             ),
@@ -60,11 +60,11 @@ def answer_using_chatgpt(user_input: str):
         ]
     )
 
-    # chain 생성 후 run
+    print("create chain and run ...")
     chain = LLMChain(llm=llm, prompt=prompt_template)
     answer = chain.run(
-        guide=get_data_loader(),
-        question=user_input
+        question=user_input,
+        verbose=True
     )
     return answer
 
@@ -82,6 +82,8 @@ class State(pc.State):
 
     @pc.var
     def output(self) -> str:
+        if not self.text.strip():
+            return "답변 대기 중 ..."
         return answer_using_chatgpt(self.text)
 
     def post(self):
@@ -105,10 +107,10 @@ def header():
     )
 
 
-def text_box(text):
+def text_box(text, is_answer):
     return pc.text(
         text,
-        background_color="#fff",
+        background_color="#fff" if is_answer else "#0A69DA",
         padding="1rem",
         border_radius="8px",
     )
@@ -116,13 +118,22 @@ def text_box(text):
 
 def message(message):
     return pc.box(
-        pc.vstack(
-            text_box(message.original_text),
-            text_box(message.text)
-        ),
+        text_box(message.original_text, False),
+        text_box(message.text, True),
         background_color="#f5f5f5",
         padding="1rem",
         border_radius="8px",
+    )
+
+
+def output():
+    return pc.box(
+        pc.text(State.output),
+        padding="1rem",
+        border="1px solid #eaeaef",
+        margin_top="1rem",
+        border_radius="8px",
+        position="relative",
     )
 
 
@@ -135,6 +146,7 @@ def index() -> pc.Component:
             spacing="1rem",
             align_items="left"
         ),
+        output(),
         pc.input(
             placeholder="질문을 입력하세요!",
             on_blur=State.set_text,
